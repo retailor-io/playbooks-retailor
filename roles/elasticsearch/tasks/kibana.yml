@@ -34,4 +34,4 @@
       TELEMETRY_ENABLED: "false"
     networks:
       - name: elk_network
-
+        ipv4_address: 172.19.0.3

@@ -62,3 +62,4 @@
       ELASTIC_HOSTS: "{{ env_vars.ELASTIC_HOSTS }}"
     networks:
       - name: elk_network
+        ipv4_address: 172.19.0.4
