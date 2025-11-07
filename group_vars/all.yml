@@ -1,4 +1,5 @@
 ---
+ansible_python_interpreter: /usr/bin/python3
 install_cadvisor_exporter: false
 install_nginx_exporter: false
 install_redis_exporter: false
