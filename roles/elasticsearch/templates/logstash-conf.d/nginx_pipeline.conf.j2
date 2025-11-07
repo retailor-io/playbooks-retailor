@@ -5,26 +5,33 @@ input {
 }
 
 filter {
- grok {
-   match => [ "message" , "%{COMBINEDAPACHELOG}+%{GREEDYDATA:extra_fields}"]
-   overwrite => [ "message" ]
- }
- mutate {
-   convert => ["response", "integer"]
-   convert => ["bytes", "integer"]
-   convert => ["responsetime", "float"]
- }
- # geoip {
- #   source => "clientip"
- #   add_tag => [ "nginx-geoip" ]
- # }
- date {
-   match => [ "timestamp" , "dd/MMM/YYYY:HH:mm:ss Z" ]
-   remove_field => [ "timestamp" ]
- }
- # useragent {
- #   source => "agent"
- # }
+  grok {
+    match => [ "message" , "%{COMBINEDAPACHELOG}+%{GREEDYDATA:extra_fields}"]
+    overwrite => [ "message" ]
+  }
+
+  mutate {
+    rename => { "extra_fields" => "real_ip" }
+    gsub => [ "real_ip", "\"", "" ] # remove qoutes
+    gsub => [ "real_ip", " ", "" ]  # remove whitespace
+
+    # fix
+    convert => ["http.response.status_code", "integer"]
+    convert => ["http.response.body.bytes", "integer"]
+    convert => ["responsetime", "float"]
+    remove_field => ["host.containerized"]
+  }
+
+  geoip {
+    source => "real_ip"
+    target => "geoip"
+    fields => ["city_name", "region_name", "country_name", "region_iso_code", "country_code2", "location"]
+  }
+
+  date {
+    match => [ "timestamp" , "dd/MMM/YYYY:HH:mm:ss Z" ]
+    remove_field => [ "timestamp" ]
+  }
 }
 
 output {
@@ -36,4 +43,3 @@ output {
     document_type => "nginx_logs"
   }
 }
-
