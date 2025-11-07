@@ -6,12 +6,16 @@
     nginx_exporter_version: "1.4.1"
     cadvisor_version: "0.46.0"
     fail2ban_exporter_version: "0.10.2"
+    mysqld_exporter_version: "0.17.2"
   roles:
-    - role: roles/node_exporter
-    - role: roles/fail2ban_exporter
-    - role: roles/redis_exporter
+    - role: roles/exporter-node
+    - role: roles/exporter-fail2ban
+
+    - role: roles/exporter-redis
       when: install_redis_exporter
-    - role: roles/cadvisor
+
+    - role: roles/exporter-cadvisor
       when: install_cadvisor_exporter
-    - role: roles/nginx_prometheus_exporter
-      when: install_nginx_exporter
+
+    - role: roles/exporter-mysql
+      when: install_mysqld_exporter

@@ -1,0 +1,12 @@
+[Unit]
+Description=mysqld exporter
+After=network.target
+
+[Service]
+User=nobody
+ExecStart=/usr/local/bin/mysqld_exporter --config.my-cnf=/home/forge/.my.cnf
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

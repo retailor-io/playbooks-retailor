@@ -5,5 +5,5 @@ custom_firewall_ports:
   - 3306
 apt_packages:
   - nfs-kernel-server
-# install_mysql_exporter: true
+install_mysqld_exporter: true
 description: 'database & filestorage node for hosting app.retailor.io'

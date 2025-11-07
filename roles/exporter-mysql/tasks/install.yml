@@ -1,0 +1,23 @@
+---
+- name: Download MySQL Prometheus Exporter
+  get_url:
+    url: "https://github.com/prometheus/mysqld_exporter/releases/download/v{{ mysqld_exporter_version }}/mysqld_exporter-{{ mysqld_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/mysqld-exporter.tar.gz"
+
+- name: Extract MySQL Prometheus Exporter
+  unarchive:
+    src: "/tmp/mysqld-exporter.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+
+- name: copy my.cnf config
+  template:
+    src: "my.cnf.j2"
+    dest: "/root/my.cnf.j2"
+
+- name: Move MySQL Prometheus Exporter binary
+  copy:
+    src: "/tmp/mysqld_exporter-{{ mysqld_exporter_version }}.linux-amd64/mysqld_exporter"
+    dest: "/usr/local/bin/mysqld_exporter"
+    remote_src: yes
+    mode: '0755'

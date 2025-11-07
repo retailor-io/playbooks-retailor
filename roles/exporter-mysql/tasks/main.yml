@@ -1,0 +1,6 @@
+---
+# ensure we have variables from .env files
+- include_tasks: ../roles/env/tasks/main.yml
+
+- include_tasks: install.yml
+- include_tasks: service.yml

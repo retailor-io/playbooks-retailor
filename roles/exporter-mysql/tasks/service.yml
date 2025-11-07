@@ -1,0 +1,23 @@
+---
+- name: Create mysqld_exporter service file
+  template:
+    src: "mysqld_exporter.service.j2"
+    dest: "/etc/systemd/system/mysqld_exporter.service"
+    mode: '0644'
+  tags:
+    - create_service
+
+- name: Reload systemd to pick up the mysqld_exporter service
+  systemd:
+    daemon_reload: yes
+  tags:
+    - reload_systemd
+
+- name: Enable and start the mysqld_exporter service
+  systemd:
+    name: mysqld_exporter
+    state: started
+    enabled: yes
+  tags:
+    - start_mysqld_exporter
+
