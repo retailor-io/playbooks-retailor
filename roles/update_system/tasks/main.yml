@@ -1,0 +1,23 @@
+---
+# Ensures a Debian/Ubuntu system is up to date
+# Upgrade type is controlled by 'update_system_upgrade_type' (default: 'safe')
+
+- name: Ensure apt cache is up to date
+  apt:
+    update_cache: yes
+  become: yes
+
+- name: Upgrade installed packages
+  apt:
+    upgrade: "{{ update_system_upgrade_type }}"
+  become: yes
+
+- name: Autoremove unnecessary packages
+  apt:
+    autoremove: yes
+  become: yes
+
+- name: Clean up retrieved package files
+  apt:
+    autoclean: yes
+  become: yes

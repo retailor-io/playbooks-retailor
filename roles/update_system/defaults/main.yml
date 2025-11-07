@@ -1,0 +1,7 @@
+---
+# Default upgrade type
+# Options:
+#   safe  → only upgrade already installed packages
+#   dist  → perform a full distribution upgrade
+
+update_system_upgrade_type: safe
