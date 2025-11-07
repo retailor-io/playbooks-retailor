@@ -1,0 +1,16 @@
+apiVersion: 1
+contactPoints:
+    - orgId: 1
+      name: 'Discord & Slack #alerts'
+      receivers:
+        - uid: beeuk6rhszaiof
+          type: slack
+          settings:
+            url: {{ env_vars.SLACK_WEBHOOK_URL }}
+          disableResolveMessage: false
+        - uid: eewvrxp9d14w0a
+          type: webhook
+          settings:
+            httpMethod: POST
+            url: {{ env_vars.DISCORD_WEBHOOK_URL }}
+          disableResolveMessage: false 

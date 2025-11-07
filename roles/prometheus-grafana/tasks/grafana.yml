@@ -16,6 +16,12 @@
     state: directory
     mode: "0755"
 
+- name: Create grafana alerting directory on host
+  file:
+    path: /etc/grafana/alerting
+    state: directory
+    mode: "0755"
+
 - name: Copy prometheus datasource config
   template:
     src: grafana-datasources.yml.j2
@@ -26,11 +32,42 @@
     src: grafana-dashboards.yml.j2
     dest: /etc/grafana/dashboards/grafana-dashboards.yml
 
-- name: Copy grafana dashboards
+- name: Ensure remote dashboard folders exist
+  file:
+    path: "/etc/grafana/dashboards/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ dashboard_folders }}"
+
+- name: Copy grafana dashboards - database
   copy:
     src: "{{ item }}"
-    dest: /etc/grafana/dashboards/{{ item | basename | regex_replace('\.j2$', '') }}
-  loop: "{{ query('fileglob', 'templates/grafana-dashboards/*.json') }}"
+    dest: /etc/grafana/dashboards/database/{{ item | basename | regex_replace('\.j2$', '') }}
+  loop: "{{ query('fileglob', 'templates/grafana-dashboards/database/*.json') }}"
+
+- name: Copy grafana dashboards - container
+  copy:
+    src: "{{ item }}"
+    dest: /etc/grafana/dashboards/container/{{ item | basename | regex_replace('\.j2$', '') }}
+  loop: "{{ query('fileglob', 'templates/grafana-dashboards/container/*.json') }}"
+
+- name: Copy grafana dashboards - cache
+  copy:
+    src: "{{ item }}"
+    dest: /etc/grafana/dashboards/cache/{{ item | basename | regex_replace('\.j2$', '') }}
+  loop: "{{ query('fileglob', 'templates/grafana-dashboards/cache/*.json') }}"
+
+- name: Copy grafana dashboards - server
+  copy:
+    src: "{{ item }}"
+    dest: /etc/grafana/dashboards/server/{{ item | basename | regex_replace('\.j2$', '') }}
+  loop: "{{ query('fileglob', 'templates/grafana-dashboards/server/*.json') }}"
+
+- name: Copy grafana alerting config
+  copy:
+    src: "{{ item }}"
+    dest: /etc/grafana/alerting/{{ item | basename | regex_replace('\.j2$', '') }}
+  loop: "{{ query('fileglob', 'templates/grafana-alerting/*.j2') }}"
 
 - name: Pull Grafana Docker image
   docker_image:

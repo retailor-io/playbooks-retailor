@@ -1,0 +1,209 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: 1m eval
+      folder: alerts
+      interval: 10s
+      rules:
+        - uid: cefvxm65auneod
+          title: Disk Space Used - Database Storage
+          condition: D
+          data:
+            - refId: B
+              relativeTimeRange:
+                from: 86400
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                adhocFilters: []
+                datasource:
+                    type: prometheus
+                    uid: PBFA97CFB590B2093
+                disableTextWrap: false
+                editorMode: builder
+                expr: ( + 100) - (node_filesystem_avail_bytes{job="node_exporter", device!~"rootfs", mountpoint="/mnt/database_storage_volume"} * 100 / node_filesystem_size_bytes{job="node_exporter", device!~"rootfs", mountpoint="/mnt/database_storage_volume"})
+                format: time_series
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                interval: ""
+                intervalFactor: 1
+                intervalMs: 15000
+                legendFormat: '{{mountpoint}}'
+                maxDataPoints: 43200
+                range: false
+                refId: B
+                step: 240
+                useBackend: false
+            - refId: D
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params: []
+                      reducer:
+                        params: []
+                        type: avg
+                      type: query
+                datasource:
+                    name: Expression
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: D
+                type: threshold
+          dashboardUid: rYdddlPWk
+          panelId: 152
+          noDataState: NoData
+          execErrState: Error
+          for: 1m
+          annotations:
+            __dashboardUid__: rYdddlPWk
+            __panelId__: "152"
+          labels: {}
+          isPaused: false
+          notification_settings:
+            receiver: 'Discord & Slack #alerts'
+        - uid: ff1ifyc0gczr4e
+          title: Disk Space Used - Root FS
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 86400
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                adhocFilters: []
+                datasource:
+                    type: prometheus
+                    uid: PBFA97CFB590B2093
+                disableTextWrap: false
+                editorMode: builder
+                expr: 100 - (node_filesystem_avail_bytes{job="node_exporter", device!~"rootfs", mountpoint="/"} * 100 / node_filesystem_size_bytes{job="node_exporter", device!~"rootfs", mountpoint="/"})
+                format: time_series
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                interval: ""
+                intervalFactor: 1
+                intervalMs: 15000
+                legendFormat: '{{mountpoint}}'
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                step: 240
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: rYdddlPWk
+          panelId: 152
+          noDataState: NoData
+          execErrState: Error
+          for: 1m
+          annotations:
+            __dashboardUid__: rYdddlPWk
+            __panelId__: "152"
+          isPaused: false
+          notification_settings:
+            receiver: 'Discord & Slack #alerts'
+        - uid: ef1ir88aq1tz4f
+          title: Web CPU - Idle low threshold
+          condition: value
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 900
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                adhocFilters: []
+                datasource:
+                    type: prometheus
+                    uid: PBFA97CFB590B2093
+                disableTextWrap: false
+                editorMode: code
+                expr: round(sum(irate(node_cpu_seconds_total{instance="loadbalancer:9100", job="node_exporter", mode="idle"}[$__rate_interval])) / scalar(count(count by(cpu) (node_cpu_seconds_total{instance="loadbalancer:9100", job="node_exporter"}))), 0.01)
+                format: time_series
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                interval: ""
+                intervalFactor: 1
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                step: 240
+                useBackend: false
+            - refId: value
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 2
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - I
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: value
+                type: threshold
+          dashboardUid: rYdddlPWk
+          panelId: 3
+          noDataState: NoData
+          execErrState: Error
+          annotations:
+            __dashboardUid__: rYdddlPWk
+            __panelId__: "3"
+            description: CPU usage for {{ $labels.instance }} has exceeded 80% ({{ $values.A.Value }}) for the last 5 minutes.
+            summary: A web server is under high-load!
+          isPaused: false
+          notification_settings:
+            receiver: slack local
+

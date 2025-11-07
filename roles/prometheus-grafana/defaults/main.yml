@@ -1,0 +1,6 @@
+---
+dashboard_folders:
+  - database
+  - container
+  - cache
+  - server
