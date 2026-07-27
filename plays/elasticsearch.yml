@@ -2,7 +2,7 @@
 - name: Install ELK stack using Docker
   hosts: elasticsearch
   vars:
-    elk_version: "8.17.0"
+    elk_version: "9.4.4"
   roles:
     # TODO check for docker install before purging it. This nukes containers
     # we might not want destroyed.
