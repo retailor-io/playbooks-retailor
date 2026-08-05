@@ -1,14 +1,6 @@
 ---
 - name: Start and enable Docker service
-  systemd:
+  ansible.builtin.systemd:
     name: docker
-    enabled: yes
-    state: started
-
-- name: Start and enable Docker service
-  systemd:
-    name: docker
-    enabled: yes
-    state: started
-  when: distro_supported
-
+    enabled: "{{ docker_service_enabled }}"
+    state: "{{ docker_service_state }}"

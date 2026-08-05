@@ -1,12 +1,49 @@
 ---
-- name: Add Docker repository
-  apt_repository:
-    repo: deb {{ install_url }}
-    state: present
-  when: distro_supported
+- name: Remove conflicting/legacy Docker packages
+  ansible.builtin.package:
+    name: "{{ docker_clean_install_remove_packages }}"
+    state: absent
 
-- name: Install Docker
-  apt:
-    name: "{{ docker_package }}"
+- name: Install prerequisite packages
+  ansible.builtin.package:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
     state: present
-  when: distro_supported
+    update_cache: true
+
+- name: Ensure apt keyrings directory exists
+  ansible.builtin.file:
+    path: "{{ docker_apt_keyring_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download Docker's official GPG key
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_repo_url }}/{{ ansible_facts['distribution'] | lower }}/gpg"
+    dest: "{{ docker_apt_keyring_file }}"
+    mode: "0644"
+    force: true
+
+- name: Add Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else ansible_facts['architecture'] }}
+      signed-by={{ docker_apt_keyring_file }}]
+      {{ docker_apt_repo_url }}/{{ ansible_facts['distribution'] | lower }}
+      {{ ansible_facts['distribution_release'] }} stable
+    state: present
+    filename: docker
+    update_cache: false
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: "{{ docker_apt_cache_valid_time }}"
+
+- name: Install Docker packages
+  ansible.builtin.package:
+    name: "{{ docker_install_packages }}"
+    state: present
+  notify: Restart Docker

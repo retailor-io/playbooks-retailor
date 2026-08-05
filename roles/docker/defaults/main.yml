@@ -1,4 +1,12 @@
-clean_install_remove_packages:
+---
+# Distros this role knows how to configure the Docker apt repo for.
+docker_supported_distros:
+  - ubuntu
+  - debian
+
+# Packages to purge before installing Docker CE, to avoid conflicts
+# with distro-provided / older Docker packages.
+docker_clean_install_remove_packages:
   - docker.io
   - docker-doc
   - docker-compose
@@ -6,10 +14,31 @@ clean_install_remove_packages:
   - containerd
   - runc
 
-install_packages:
+# Packages installed from the official Docker apt repository.
+docker_install_packages:
   - docker-ce
   - docker-ce-cli
   - containerd.io
   - docker-buildx-plugin
-  - docker-compose
   - docker-compose-plugin
+
+# Base URL for the Docker apt repository. {{ '%s' }} is filled in with the
+# lowercased distro name (ubuntu/debian).
+docker_apt_repo_url: "https://download.docker.com/linux"
+
+# Where the Docker GPG signing key is stored.
+docker_apt_keyring_dir: /etc/apt/keyrings
+docker_apt_keyring_file: "{{ docker_apt_keyring_dir }}/docker.asc"
+
+# apt cache freshness, in seconds, before Ansible refreshes it.
+docker_apt_cache_valid_time: 3600
+
+# Users to add to the "docker" group (passwordless docker CLI access).
+docker_users: []
+
+# Whether to start and enable the docker service.
+docker_service_enabled: true
+docker_service_state: started
+
+# Fail the play if the distro isn't supported, instead of silently skipping.
+docker_fail_on_unsupported_distro: true

@@ -1,0 +1,5 @@
+---
+- name: Docker on host
+  hosts: all
+  roles:
+    - role: roles/docker

@@ -1,13 +1,22 @@
 ---
 galaxy_info:
+  role_name: docker
   author: Your Name
-  description: Ansible role to install and manage Docker on Debian
+  description: Installs and manages Docker CE from the official Docker apt repository
   license: MIT
-  min_ansible_version: "2.9"
+  min_ansible_version: "2.14"
   platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
     - name: Debian
       versions:
-        - all
+        - bullseye
+        - bookworm
   galaxy_tags:
     - docker
+    - containers
+
 dependencies: []
