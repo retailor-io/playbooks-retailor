@@ -1,12 +1,16 @@
 ---
 - name: Read .env file
   ansible.builtin.slurp:
-    src: "../.env"
+    src: "{{ playbook_dir }}/../.env"
   delegate_to: localhost
   register: env_file
 
-- name: Parse .env file
+- name: Build list of key/value pairs
   ansible.builtin.set_fact:
-    env_vars: "{{ dict(env_file['content'] | b64decode | split('\n') | select('search', '=') | map('split', '=', 1) | list) }}"
+    env_lines: "{{ (env_file['content'] | b64decode).splitlines() | select('match', '^[^#=]+=.*$') | list }}"
 
+- name: Parse .env file into a dict
+  ansible.builtin.set_fact:
+    env_vars: "{{ env_vars | default({}) | combine({ (item.split('=', 1)[0] | trim): (item.split('=', 1)[1] | trim) }) }}"
+  loop: "{{ env_lines }}" 
 
