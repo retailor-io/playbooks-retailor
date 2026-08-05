@@ -1,0 +1,77 @@
+---
+- name: Fail fast if no routes were supplied
+  ansible.builtin.fail:
+    msg: >-
+      traefik_web_private_ips is empty. Set the WEB_IPS env var
+      (JSON list) before running, or override the variable directly, e.g.
+      -e traefik_web_private_ips='["10.0.1.11","10.0.1.12"]'
+  when: env_vars.WEB_IPS | length == 0
+
+- name: Ensure Traefik config directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ traefik_config_dir }}"
+    - "{{ traefik_dynamic_dir }}"
+
+- name: Create acme.json with correct permissions
+  ansible.builtin.file:
+    path: "{{ traefik_config_dir }}/acme.json"
+    state: touch
+    owner: root
+    group: root
+    mode: "0600"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Deploy Traefik static config
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_config_dir }}/traefik.yml"
+    mode: "0644"
+  notify: Restart traefik
+
+- name: Deploy dynamic downstream routes file
+  ansible.builtin.template:
+    src: dynamic-hosts.yml.j2
+    dest: "{{ traefik_dynamic_dir }}/hosts.yml"
+    mode: "0644"
+  notify: Restart traefik
+
+- name: Deploy dynamic analytics file
+  ansible.builtin.template:
+    src: dynamic-analytics.yml.j2
+    dest: "{{ traefik_dynamic_dir }}/analytics.yml"
+    mode: "0644"
+  notify: Restart traefik
+
+- name: Pull traefik image
+  community.docker.docker_image:
+    name: "{{ traefik_image }}"
+    source: pull
+  notify: Restart traefik
+
+- name: Deploy traefik systemd unit
+  ansible.builtin.template:
+    src: traefik.service.j2
+    dest: /etc/systemd/system/traefik.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable and start traefik service
+  ansible.builtin.systemd:
+    name: traefik
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Remove dangling/old traefik images
+  community.docker.docker_prune:
+    images: true
+    images_filters:
+      dangling: true
+

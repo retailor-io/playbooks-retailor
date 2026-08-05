@@ -1,0 +1,21 @@
+## Managed by Ansible — do not edit by hand.
+## Source: traefik_analytics_private_ip (group_vars/lb.yml)
+http:
+  routers:
+    analytics:
+      rule: "Host(`analytics.{{ env_vars.DOMAIN }}`)"
+      entryPoints:
+        - websecure
+      service: analytics-svc
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    analytics-svc:
+      loadBalancer:
+        servers:
+          - url: "http://{{ env_vars.ANALYTICS_IP }}:3000"
+        healthCheck:
+          path: /api/heartbeat
+          interval: "10s"
+          timeout: "3s"

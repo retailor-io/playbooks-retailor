@@ -1,6 +1,25 @@
 ---
+## REQUIRED
+# DOMAIN ""
+# ANALYTICS_IP ""
+# WEB_IPS '["", ""]'
+
+# apt_packages:
+#   - nginx
 custom_firewall_ports:
   - 80
   - 443
-install_nginx_exporter: true
-description: "load balancer serving web servers for retailor.io"
+  # - 9100 # traefik exporter - internal only
+  # - 8080 # traefik dashboard - internal only
+# install_nginx_exporter: true
+description: "load balancer serving traefik webserver for retailor.io"
+
+traefik_image: "traefik:v3.1"
+traefik_acme_email: webmaster@retailor.io
+traefik_config_dir: "/etc/traefik"
+traefik_dynamic_dir: "/etc/traefik/dynamic"
+
+traefik_web_port: 80
+traefik_websecure_port: 443
+traefik_dashboard_port: 8080
+traefik_dashboard_insecure: true

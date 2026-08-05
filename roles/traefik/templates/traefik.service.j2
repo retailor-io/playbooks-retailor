@@ -1,0 +1,28 @@
+[Unit]
+Description=Traefik reverse proxy
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+RestartSec=5
+
+# Clean up any stale container from a previous run/crash
+ExecStartPre=-/usr/bin/docker rm -f traefik
+
+ExecStart=/usr/bin/docker run --rm \
+  --name traefik \
+  --network host \
+  --security-opt no-new-privileges:true \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v {{ traefik_config_dir }}/traefik.yml:/etc/traefik/traefik.yml:ro \
+  -v {{ traefik_dynamic_dir }}:/etc/traefik/dynamic:ro \
+  -v {{ traefik_config_dir }}/acme.json:/etc/traefik/acme.json \
+  {{ traefik_image }}
+
+ExecStop=/usr/bin/docker stop traefik
+
+[Install]
+WantedBy=multi-user.target

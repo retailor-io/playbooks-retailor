@@ -1,0 +1,8 @@
+---
+- name: Install traefik using Docker
+  hosts: all
+  roles:
+    - role: roles/firewall
+    - role: roles/docker
+    - role: roles/env
+    - role: roles/traefik

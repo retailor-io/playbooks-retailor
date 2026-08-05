@@ -1,0 +1,20 @@
+## Managed by Ansible — do not edit by hand.
+## Source: traefik_web_private_ips (group_vars/lb.yml)
+http:
+  routers:
+    retailor-web:
+      rule: "Host(`app.{{ env_vars.DOMAIN }}`)"
+      service: retailor-web-svc
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    retailor-web-svc:
+      loadBalancer:
+        servers:
+{% for web_ip in env_vars.WEB_IPS %}
+          - url: "http://{{ web_ip }}:80"
+{% endfor %}
+
