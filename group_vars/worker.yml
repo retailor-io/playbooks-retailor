@@ -1,4 +1,5 @@
 ---
 apt_packages:
   - nfs-common
+install_cadvisor_exporter: true
 description: 'queue server for laravel'
