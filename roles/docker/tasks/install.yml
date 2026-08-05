@@ -43,7 +43,9 @@
     cache_valid_time: "{{ docker_apt_cache_valid_time }}"
 
 - name: Install Docker packages
-  ansible.builtin.package:
-    name: "{{ docker_install_packages }}"
+  ansible.builtin.apt:
+    pkg: "{{ item }}"
     state: present
+    update_cache: yes
+  with_items: "{{ docker_install_packages | default([]) }}"
   notify: Restart Docker
