@@ -1,0 +1,37 @@
+---
+# ---------------------------------------------------------------------------
+# Global variables for the docker + umami deployment
+# ---------------------------------------------------------------------------
+custom_firewall_ports:
+  - 3000
+description: Umami web analytics
+
+# --- Docker role ---
+docker_users_to_add:
+  - "{{ ansible_user }}"   # add the SSH user to the docker group
+
+# --- Umami role ---
+umami_base_dir: /opt/umami
+umami_image: "ghcr.io/umami-software/umami:latest"
+umami_container_name: umami
+umami_port: 3000                     # host port Umami will be exposed on
+
+# Address the umami_port is bound to on the host.
+# - "127.0.0.1" if your reverse proxy runs on this same host (loopback only)
+# - "0.0.0.0" if your reverse proxy is elsewhere (another host/container) and
+#   needs to reach this port over the network
+umami_bind_address: "0.0.0.0"
+
+# Postgres settings (used by the umami-db container)
+umami_db_container_name: umami-db
+umami_db_image: "postgres:15-alpine"
+umami_db_name: umami
+umami_db_user: umami
+# IMPORTANT: override this in inventory/vars, --extra-vars, or (better) Ansible Vault.
+# Do not leave the default password in production.
+umami_db_password: "fc7tBTxsuAulmYmSl8AE0q13eq3f94f7u3u6"
+
+# A random string used by Umami to encrypt/salt data. Generate your own, e.g.:
+#   openssl rand -hex 32
+# Override this in production via --extra-vars or vault.
+umami_app_secret: "dichotomizing-triads-cosmochemistry-amidols"

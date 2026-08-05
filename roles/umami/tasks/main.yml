@@ -1,0 +1,50 @@
+---
+- name: Ensure pip and Docker SDK for Python are installed (needed by community.docker modules)
+  ansible.builtin.apt:
+    name: "{{ umami_python_docker_sdk_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure Umami base directory exists
+  ansible.builtin.file:
+    path: "{{ umami_base_dir }}"
+    state: directory
+    mode: "0750"
+    owner: root
+    group: root
+
+- name: Deploy docker-compose.yml for Umami stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ umami_base_dir }}/docker-compose.yml"
+    mode: "0640"
+    owner: root
+    group: root
+  notify: recreate umami stack
+
+- name: Flush handlers so compose file changes apply before we verify status
+  ansible.builtin.meta: flush_handlers
+
+- name: Start (or ensure running) the Umami + Postgres stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ umami_base_dir }}"
+    state: present
+  register: umami_compose_result
+
+- name: Show compose deployment result
+  ansible.builtin.debug:
+    var: umami_compose_result.changed
+
+- name: Wait for Umami HTTP endpoint to become available
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ umami_port }}/api/heartbeat"
+    status_code: 200
+  register: umami_health
+  until: umami_health.status == 200
+  retries: 5
+  delay: 10
+
+- name: Umami health check result
+  ansible.builtin.debug:
+    msg: "Umami is up and responding on port {{ umami_port }}."

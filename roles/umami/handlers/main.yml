@@ -1,0 +1,7 @@
+---
+- name: recreate umami stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ umami_base_dir }}"
+    state: present
+    recreate: always
+  listen: recreate umami stack

@@ -1,0 +1,40 @@
+{{ ansible_managed | comment }}
+# Based on: https://github.com/umami-software/umami/blob/master/docker-compose.yml
+services:
+  umami:
+    image: "{{ umami_image }}"
+    container_name: "{{ umami_container_name }}"
+    ports:
+      - "{{ umami_bind_address }}:{{ umami_port }}:3000"
+    environment:
+      DATABASE_URL: "postgresql://{{ umami_db_user }}:{{ umami_db_password }}@db:5432/{{ umami_db_name }}"
+      APP_SECRET: "{{ umami_app_secret }}"
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:3000/api/heartbeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: "{{ umami_db_image }}"
+    container_name: "{{ umami_db_container_name }}"
+    environment:
+      POSTGRES_DB: "{{ umami_db_name }}"
+      POSTGRES_USER: "{{ umami_db_user }}"
+      POSTGRES_PASSWORD: "{{ umami_db_password }}"
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  umami-db-data:

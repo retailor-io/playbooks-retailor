@@ -1,0 +1,7 @@
+---
+umami_python_docker_sdk_packages:
+  - python3-pip
+  - python3-docker
+
+umami_restart_policy: unless-stopped
+umami_docker_network: umami_net
