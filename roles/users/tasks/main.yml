@@ -1,0 +1,47 @@
+---
+- name: Ensure required packages for user management are present
+  ansible.builtin.apt:
+    name:
+      - sudo
+      - acl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create primary group for each user
+  ansible.builtin.group:
+    name: "{{ item.username }}"
+    state: present
+  loop: "{{ users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  become: true
+
+- name: Create user accounts
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    group: "{{ item.username }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: true
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    create_home: true
+    password: "{{ item.password | default(omit) }}"
+    update_password: on_create
+    state: present
+  loop: "{{ users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  become: true
+
+- name: Ensure .ssh directory exists for each user
+  ansible.builtin.file:
+    path: "/home/{{ item.username }}/.ssh"
+    state: directory
+    owner: "{{ item.username }}"
+    group: "{{ item.username }}"
+    mode: "0700"
+  loop: "{{ users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  become: true
+  when: item.ssh_key is defined
