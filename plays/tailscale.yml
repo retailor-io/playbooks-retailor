@@ -1,7 +1,0 @@
----
-- name: Install tailscale
-  hosts: all
-  roles:
-    - role: roles/tailscale
-      vars:
-        tailscale_authkey: "{{ lookup('env', 'TAILSCALE_KEY') }}"
