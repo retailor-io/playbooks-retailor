@@ -14,7 +14,7 @@ http:
     retailor-web-svc:
       loadBalancer:
         servers:
-{% for web_ip in env_vars.WEB_IPS %}
+{% for web_ip in env_vars.WEB_IPS | from_json %}
           - url: "http://{{ web_ip }}:80"
 {% endfor %}
 
