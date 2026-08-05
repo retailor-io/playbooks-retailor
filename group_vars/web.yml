@@ -1,8 +1,7 @@
 ---
 custom_firewall_ports:
   - 80
-  - 443
 apt_packages:
   - nfs-common
-install_nginx_exporter: true
+install_cadvisor_exporter: true
 description: 'webserver node for hosting retailor laravel project'
