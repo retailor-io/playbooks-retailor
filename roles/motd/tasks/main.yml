@@ -33,7 +33,7 @@
       owner: root
       group: root
       mode: +x
-    when: description
+    when: description is defined and description | length > 0
 
   - name: check if help-text motd exists
     stat:
