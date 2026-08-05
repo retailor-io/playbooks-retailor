@@ -1,9 +1,4 @@
 ---
-- name: Create a Docker network for Grafana
-  docker_network:
-    name: monitoring_network
-    state: present
-
 - name: Create grafana datasources directory on host
   file:
     path: /etc/grafana/datasources
@@ -87,7 +82,7 @@
       - /etc/grafana/datasources:/etc/grafana/provisioning/datasources
       - /etc/grafana/dashboards:/etc/grafana/provisioning/dashboards
     networks:
-      - name: monitoring_network
+      - name: monitoring
     env:
       GF_SECURITY_ADMIN_PASSWORD: "{{ env_vars.GRAFANA_PASSWORD }}" # Customize the password
 

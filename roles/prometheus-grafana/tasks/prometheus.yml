@@ -1,9 +1,4 @@
 ---
-- name: Create a Docker network for Prometheus
-  docker_network:
-    name: monitoring_network
-    state: present
-
 - name: Pull Prometheus Docker image
   docker_image:
     name: prom/prometheus
@@ -32,5 +27,5 @@
     volumes:
       - /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
-      - name: monitoring_network
+      - name: monitoring
 

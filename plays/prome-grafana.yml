@@ -6,5 +6,5 @@
     grafana_version: "latest"
     cadvisor_version: "0.46.0"
   roles:
-    # - role: roles/docker
+    - role: roles/docker
     - role: roles/prometheus-grafana

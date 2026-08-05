@@ -1,9 +1,4 @@
 ---
-- name: Create a Docker network for loki
-  docker_network:
-    name: monitoring_network
-    state: present
-
 - name: Pull loki Docker image
   docker_image:
     name: grafana/loki:latest
@@ -33,4 +28,4 @@
     volumes:
       - /etc/loki/config.yml:/etc/loki/config.yml
     networks:
-      - name: monitoring_network
+      - name: monitoring

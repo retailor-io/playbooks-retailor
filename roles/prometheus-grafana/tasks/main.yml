@@ -2,6 +2,7 @@
 # ensure we have variables from .env files
 - include_tasks: ../roles/env/tasks/main.yml
 
+- include_tasks: monitoring-network.yml
 - include_tasks: prometheus.yml
 - include_tasks: grafana.yml
 

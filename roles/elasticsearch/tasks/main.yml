@@ -2,6 +2,7 @@
 # ensure we have variables from .env files
 - include_tasks: ../roles/env/tasks/main.yml
 
+- include_tasks: elk-network.yml
 - include_tasks: elasticsearch.yml
 - include_tasks: kibana.yml
 - include_tasks: logstash.yml

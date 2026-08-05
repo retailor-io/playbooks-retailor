@@ -1,0 +1,5 @@
+---
+- name: Create a Docker network for Monitoring
+  docker_network:
+    name: monitoring
+    state: present
