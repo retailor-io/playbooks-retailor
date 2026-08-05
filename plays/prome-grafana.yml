@@ -1,6 +1,6 @@
 ---
 - name: Install prometheus & grafana using Docker
-  hosts: grafana
+  hosts: all
   vars:
     prometheus_version: "latest"
     grafana_version: "latest"
