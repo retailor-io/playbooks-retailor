@@ -1,10 +1,7 @@
 ---
 ansible_python_interpreter: /usr/bin/python3
-install_cadvisor_exporter: false
-install_nginx_exporter: false
-install_redis_exporter: false
 users:
-  - username: forge
+  - username: kevin
     oh_my_zsh:
       theme: robbyrussell
   - username: root
@@ -13,3 +10,17 @@ users:
 custom_firewall_ports:
   - 9100  # node exporter
   - 9191  # fail2ban exporter
+# exporter versions
+node_exporter_version: "1.9.0"
+fail2ban_exporter_version: "0.10.2"
+cadvisor_version: "0.46.0"
+#redis_exporter_version: ??
+mysqld_exporter_version: "0.17.2"
+nginx_exporter_version: "1.4.1"
+# disable exporters by default
+install_node_exporter: true
+install_fail2ban_exporter: true
+install_cadvisor_exporter: false
+install_redis_exporter: false
+install_mysqld_exporter: false
+install_nginx_exporter: false
