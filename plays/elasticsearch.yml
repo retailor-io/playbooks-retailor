@@ -1,6 +1,6 @@
 ---
 - name: Install ELK stack using Docker
-  hosts: elasticsearch
+  hosts: all
   vars:
     elk_version: "9.4.4"
   roles:
@@ -8,5 +8,5 @@
     # we might not want destroyed.
     # Leave a file, or read the same input requirements into a apt check
     # which skips purge if satisfied.
-    #   - role: roles/docker
+    - role: roles/docker
     - role: roles/elasticsearch
