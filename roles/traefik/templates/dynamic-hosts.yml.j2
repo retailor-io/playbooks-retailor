@@ -17,4 +17,8 @@ http:
 {% for web_ip in env_vars.WEB_IPS | from_json %}
           - url: "http://{{ web_ip }}:80"
 {% endfor %}
+        healthCheck:
+          path: /health
+          interval: "10s"
+          timeout: "3s"
 
