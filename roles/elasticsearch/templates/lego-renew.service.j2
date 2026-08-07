@@ -14,6 +14,7 @@ ExecStart={{ elk_lego_install_dir }}/lego \
   --server "{{ elk_tls_acme_server }}" \
   --domains "{{ elk_tls_domain }}" \
   --dns cloudflare \
+  --dns.resolvers "1.1.1.1:53,8.8.8.8:53" \
   --path "{{ elk_lego_path }}" \
   --run-hook "/usr/bin/docker compose -f {{ elk_base_dir }}/docker-compose.yml -p {{ elk_compose_project_name }} restart elasticsearch kibana logstash" \
   renew --days {{ elk_tls_renew_days }}
