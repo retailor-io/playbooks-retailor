@@ -27,6 +27,9 @@ certificatesResolvers:
     acme:
       email: "{{ traefik_acme_email }}"
       storage: /etc/traefik/acme.json
+{% if traefik_acme_staging | bool %}
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+{% endif %}
       httpChallenge:
         entryPoint: web
 

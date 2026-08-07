@@ -9,6 +9,10 @@ http:
         - websecure
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "app.{{ env_vars.DOMAIN }}"
+            sans:
+              - "blog.{{ env_vars.DOMAIN }}"
 
   services:
     retailor-web-svc:

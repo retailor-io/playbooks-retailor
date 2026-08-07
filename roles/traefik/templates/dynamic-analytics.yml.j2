@@ -9,6 +9,10 @@ http:
       service: analytics-svc
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "analytics.{{ env_vars.DOMAIN }}"
+            sans:
+              - "blog.{{ env_vars.DOMAIN }}"
 
   services:
     analytics-svc:

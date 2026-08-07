@@ -5,6 +5,7 @@ traefik_websecure_port: 443
 traefik_dashboard_port: 8080
 traefik_metrics_port: 8100
 traefik_dashboard_insecure: true   # ufw should only allow from tailscale or vnet
+traefik_acme_staging: "{{ lookup('env', 'TRAEFIK_ACME_STAGING') | default('false', true) }}"
 
 domain: "{{ lookup('env', 'DOMAIN') | default('', true) }}"
 # Single source of truth for static routing. Expected to be overridden
