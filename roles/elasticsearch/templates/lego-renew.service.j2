@@ -1,0 +1,28 @@
+# ansible_managed
+[Unit]
+Description=Renew ELK TLS certificate via lego (Cloudflare DNS-01)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ elk_cloudflare_token_env_file }}
+ExecStart={{ elk_lego_install_dir }}/lego \
+  --accept-tos \
+  --email "{{ elk_tls_acme_email }}" \
+  --server "{{ elk_tls_acme_server }}" \
+  --domains "{{ elk_tls_domain }}" \
+  --dns cloudflare \
+  --path "{{ elk_lego_path }}" \
+  --run-hook "/usr/bin/docker compose -f {{ elk_base_dir }}/docker-compose.yml -p {{ elk_compose_project_name }} restart elasticsearch kibana logstash" \
+  renew --days {{ elk_tls_renew_days }}
+User=root
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lego-renew
+
+# Light hardening. NoNewPrivileges/ProtectSystem kept loose enough that
+# lego can write certs under elk_lego_path and reach the docker socket
+# via the docker CLI.
+PrivateTmp=yes

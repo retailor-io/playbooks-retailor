@@ -1,8 +1,213 @@
 ---
-# ensure we have variables from .env files
-- include_tasks: ../roles/env/tasks/main.yml
+# ---------------------------------------------------------------------------
+# TLS (elk_tls_enabled) and X-Pack security (elk_security_enabled) are
+# documented as independent switches, but Elasticsearch only honors
+# xpack.security.http.ssl.* when xpack.security.enabled is also true. So
+# whenever TLS is on, security (and therefore basic auth / ELASTIC_PASSWORD)
+# is force-enabled too - elk_effective_security_enabled is the single fact
+# every template and task below should use instead of elk_security_enabled
+# directly, so this coupling only has to be expressed once.
+# ---------------------------------------------------------------------------
+- name: Derive effective security state (TLS implies security)
+  ansible.builtin.set_fact:
+    elk_effective_security_enabled: "{{ elk_security_enabled or elk_tls_enabled }}"
 
-- include_tasks: elk-network.yml
-- include_tasks: elasticsearch.yml
-- include_tasks: kibana.yml
-- include_tasks: logstash.yml
+- name: Assert Docker is available
+  ansible.builtin.command: docker info
+  register: elk_docker_info
+  changed_when: false
+  failed_when: elk_docker_info.rc != 0
+
+- name: Ensure Docker Compose plugin is installed
+  ansible.builtin.command: docker compose version
+  register: elk_compose_check
+  changed_when: false
+  failed_when: elk_compose_check.rc != 0
+
+- name: Ensure we have pip installed
+  apt:
+    pkg: "python3-pip"
+    state: present
+
+- name: Ensure python docker SDK is present for community.docker modules
+  apt:
+    pkg:
+      - python3-docker
+      - python3-requests
+    state: present
+
+- name: Create base ELK directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ elk_base_dir }}"
+    - "{{ elk_base_dir }}/config"
+    - "{{ elk_base_dir }}/config/elasticsearch"
+    - "{{ elk_base_dir }}/config/kibana"
+    - "{{ elk_base_dir }}/config/logstash"
+    - "{{ elk_base_dir }}/config/logstash/pipeline"
+
+# ---------------------------------------------------------------------------
+# TLS (must happen before compose/config templating below, since those
+# templates reference the cert file paths lego produces)
+# ---------------------------------------------------------------------------
+- name: Issue/renew TLS certificate and set up renewal automation
+  ansible.builtin.include_tasks: tls.yml
+  when: elk_tls_enabled
+
+- name: Set connection facts used by health checks below
+  ansible.builtin.set_fact:
+    elk_scheme: "{{ 'https' if elk_tls_enabled else 'http' }}"
+    elk_validate_certs: "{{ not elk_tls_enabled }}"
+    elk_elasticsearch_client_host: "{{ elk_tls_domain if elk_tls_enabled else elk_elasticsearch_container_name }}"
+
+# ---------------------------------------------------------------------------
+# Configs
+# ---------------------------------------------------------------------------
+- name: Template elasticsearch.yml
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: "{{ elk_base_dir }}/config/elasticsearch/elasticsearch.yml"
+    mode: "0644"
+  notify: "recreate elasticsearch"
+
+- name: Template kibana.yml
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: "{{ elk_base_dir }}/config/kibana/kibana.yml"
+    mode: "0644"
+  notify: "recreate kibana"
+
+- name: Template logstash.yml
+  ansible.builtin.template:
+    src: logstash.yml.j2
+    dest: "{{ elk_base_dir }}/config/logstash/logstash.yml"
+    mode: "0644"
+  notify: "recreate logstash"
+
+- name: Template logstash pipelines.yml
+  ansible.builtin.template:
+    src: pipelines.yml.j2
+    dest: "{{ elk_base_dir }}/config/logstash/pipelines.yml"
+    mode: "0644"
+  notify: "recreate logstash"
+
+- name: Template logstash main pipeline
+  ansible.builtin.template:
+    src: main.conf.j2
+    dest: "{{ elk_base_dir }}/config/logstash/pipeline/main.conf"
+    mode: "0644"
+  notify: "recreate logstash"
+
+- name: Template logstash nginx pipeline
+  ansible.builtin.template:
+    src: pipeline-nginx.conf.j2
+    dest: "{{ elk_base_dir }}/config/logstash/pipeline/pipeline-nginx.conf"
+    mode: "0644"
+  notify: "recreate logstash"
+
+- name: Template logstash laravel pipeline
+  ansible.builtin.template:
+    src: pipeline-laravel.conf.j2
+    dest: "{{ elk_base_dir }}/config/logstash/pipeline/pipeline-laravel.conf"
+    mode: "0644"
+  notify: "recreate logstash"
+
+- name: Template docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ elk_base_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: "restart elk stack"
+
+# ---------------------------------------------------------------------------
+# Bring up the stack
+# ---------------------------------------------------------------------------
+- name: Flush handlers so config changes apply before we continue
+  ansible.builtin.meta: flush_handlers
+
+- name: Start ELK stack via docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    state: present
+  register: elk_compose_result
+
+- name: Wait for Elasticsearch to answer on its HTTP port
+  ansible.builtin.uri:
+    url: "{{ elk_scheme }}://localhost:{{ elk_elasticsearch_http_port }}"
+    validate_certs: "{{ elk_validate_certs }}"
+    status_code:
+      - 200
+      - 401  # 401 is expected once security is enabled but before we authenticate
+  register: elk_es_wait
+  until: elk_es_wait.status in [200, 401]
+  retries: 30
+  delay: 10
+
+# ---------------------------------------------------------------------------
+# Security bootstrap: set built-in user passwords (idempotent)
+# ---------------------------------------------------------------------------
+- name: Set kibana_system password
+  ansible.builtin.uri:
+    url: "{{ elk_scheme }}://localhost:{{ elk_elasticsearch_http_port }}/_security/user/kibana_system/_password"
+    validate_certs: "{{ elk_validate_certs }}"
+    method: POST
+    user: elastic
+    password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      password: "{{ elk_kibana_system_password }}"
+    status_code: 200
+  when: elk_effective_security_enabled
+  register: elk_set_kibana_pw
+  retries: 5
+  delay: 10
+  until: elk_set_kibana_pw is succeeded
+
+- name: Set logstash_system password
+  ansible.builtin.uri:
+    url: "{{ elk_scheme }}://localhost:{{ elk_elasticsearch_http_port }}/_security/user/logstash_system/_password"
+    validate_certs: "{{ elk_validate_certs }}"
+    method: POST
+    user: elastic
+    password: "{{ elk_elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      password: "{{ elk_logstash_system_password }}"
+    status_code: 200
+  when: elk_effective_security_enabled
+  register: elk_set_logstash_pw
+  retries: 5
+  delay: 10
+  until: elk_set_logstash_pw is succeeded
+
+- name: Recreate kibana and logstash if passwords were just set for the first time
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    services:
+      - kibana
+      - logstash
+    state: present
+    recreate: always
+  when: >
+    elk_effective_security_enabled and
+    (elk_set_kibana_pw is changed or elk_set_logstash_pw is changed)
+
+- name: Wait for Kibana to answer on its HTTP port
+  ansible.builtin.uri:
+    url: "{{ elk_scheme }}://localhost:{{ elk_kibana_http_port }}/api/status"
+    validate_certs: "{{ elk_validate_certs }}"
+    status_code:
+      - 200
+  register: elk_kibana_wait
+  until: elk_kibana_wait.status == 200
+  retries: 30
+  delay: 10

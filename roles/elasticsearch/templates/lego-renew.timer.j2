@@ -1,0 +1,11 @@
+# ansible_managed
+[Unit]
+Description=Daily timer for ELK TLS certificate renewal check (lego)
+
+[Timer]
+OnCalendar=*-*-* {{ elk_tls_renew_on_calendar }}
+RandomizedDelaySec={{ elk_tls_renew_randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

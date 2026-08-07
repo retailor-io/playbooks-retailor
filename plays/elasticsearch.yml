@@ -1,12 +1,6 @@
 ---
 - name: Install ELK stack using Docker
   hosts: all
-  vars:
-    elk_version: "9.4.4"
   roles:
-    # TODO check for docker install before purging it. This nukes containers
-    # we might not want destroyed.
-    # Leave a file, or read the same input requirements into a apt check
-    # which skips purge if satisfied.
     - role: roles/docker
     - role: roles/elasticsearch

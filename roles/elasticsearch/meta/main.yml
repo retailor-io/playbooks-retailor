@@ -1,16 +1,16 @@
 ---
 galaxy_info:
-  author: Your Name
-  description: Ansible role to deploy prometheus & grafana using Docker
-  license: MIT
-  min_ansible_version: "2.9"
+  role_name: elk_stack
+  author: your-name
+  description: Deploys Elasticsearch, Logstash and Kibana via Docker Compose on a shared network
+  min_ansible_version: "2.14"
   platforms:
     - name: Debian
       versions:
-        - all
-  galaxy_tags:
-    - monitoring
-    - cadvisor
-  dependencies:
-    - docker
+        - bullseye
+        - bookworm
 
+dependencies: []
+
+collections:
+  - community.docker

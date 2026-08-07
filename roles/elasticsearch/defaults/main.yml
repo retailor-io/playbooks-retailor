@@ -1,0 +1,135 @@
+---
+# ---------------------------------------------------------------------------
+# Environment variable overrides
+# ---------------------------------------------------------------------------
+# Every setting below can also be supplied as an env var on the CONTROL node
+# (i.e. wherever `ansible-playbook` runs - a CI job, your laptop, etc.), not
+# the remote target host. `lookup('env', ...)` reads from the control node's
+# process environment at template-render time, which is exactly what you
+# want for injecting CI/CD secrets (e.g. GitHub Actions `env:`/`secrets:`,
+# a `.env` file sourced before the playbook runs) without touching inventory
+# or vault files.
+#
+# Precedence, highest first: `-e` / extra vars on the CLI > host/group_vars
+# in inventory > playbook `vars:` > these defaults (env var, if set, else
+# the literal fallback shown). So an env var set here is easy to override
+# per-host or per-run if needed - it's just the last thing consulted.
+#
+# Booleans: env vars are always strings, so `elk_tls_enabled`/
+# `elk_security_enabled` run through `| bool` to turn "true"/"false"/"1"/"0"/
+# "yes"/"no" (case-insensitive) into real Ansible booleans - a raw string
+# "false" would otherwise be truthy in Jinja `{% if %}` conditionals.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# General
+# ---------------------------------------------------------------------------
+elk_version: "{{ lookup('env', 'ELK_VERSION') | default('8.15.3', true) }}"
+
+elk_base_dir: /opt/elk
+elk_compose_project_name: elk
+
+elk_network_name: elk-network
+elk_network_subnet: "172.28.0.0/24"
+
+# Set true only after you've configured elk_elastic_password etc. for real use.
+# When false, security is disabled for a quick local/dev stack.
+elk_security_enabled: "{{ lookup('env', 'ELK_SECURITY_ENABLED') | default('true', true) | bool }}"
+
+# Change these in production (e.g. via vault, or ELK_ELASTIC_PASSWORD etc.
+# from CI secrets). These fallbacks are intentionally obvious placeholders
+# so nobody ships them by accident.
+elk_elastic_password: "{{ lookup('env', 'ELK_ELASTIC_PASSWORD') | default('ChangeMe_Elastic_123!', true) }}"
+elk_kibana_system_password: "{{ lookup('env', 'ELK_KIBANA_SYSTEM_PASSWORD') | default('ChangeMe_Kibana_123!', true) }}"
+elk_logstash_system_password: "{{ lookup('env', 'ELK_LOGSTASH_SYSTEM_PASSWORD') | default('ChangeMe_Logstash_123!', true) }}"
+
+# A pre-shared 32+ char key used to encrypt the Kibana saved-objects store.
+elk_kibana_encryption_key: "{{ lookup('env', 'ELK_KIBANA_ENCRYPTION_KEY') | default('ChangeMe_32Char_Kibana_EncKey!!!', true) }}"
+
+# ---------------------------------------------------------------------------
+# Elasticsearch
+# ---------------------------------------------------------------------------
+elk_elasticsearch_container_name: elasticsearch
+elk_elasticsearch_http_port: 9200
+elk_elasticsearch_transport_port: 9300
+elk_elasticsearch_heap_size: "1g"
+elk_elasticsearch_cluster_name: "elk-retailor"
+elk_elasticsearch_node_name: "{{ lookup('env', 'ELK_ELASTIC_NODE_NAME') | default('es01', true) }}"
+elk_elasticsearch_data_volume: elk_esdata
+
+# ---------------------------------------------------------------------------
+# Kibana
+# ---------------------------------------------------------------------------
+elk_kibana_container_name: kibana
+elk_kibana_http_port: 5601
+
+# ---------------------------------------------------------------------------
+# Logstash
+# ---------------------------------------------------------------------------
+elk_logstash_container_name: logstash
+elk_logstash_heap_size: "512m"
+elk_logstash_tcp_port: 5000
+elk_logstash_udp_port: 5000
+elk_logstash_http_port: 9600
+
+# Each pipeline that has its own beats input needs its own port - they all
+# run inside the same Logstash process, so two pipelines can't bind the same
+# port. main.conf (generic beats/tcp/udp) and the nginx/laravel example
+# pipelines are each wired to a distinct one below.
+elk_logstash_beats_port: 5044
+elk_logstash_nginx_beats_port: 5045
+elk_logstash_laravel_beats_port: 5046
+
+# ---------------------------------------------------------------------------
+# Docker image repository (override for an internal mirror/proxy)
+# ---------------------------------------------------------------------------
+elk_docker_image_repo: "docker.elastic.co"
+
+# ---------------------------------------------------------------------------
+# TLS via lego (ACME DNS-01 against Cloudflare)
+# ---------------------------------------------------------------------------
+# Master switch. When false, the stack runs plain HTTP as before (nothing
+# below this point applies).
+elk_tls_enabled: "{{ lookup('env', 'ELK_TLS_ENABLED') | default('true', true) | bool }}"
+
+# The public DNS name this node is reachable at, e.g. "logs.domain.com".
+# An A record for this name -> the node's private IP is assumed to already
+# exist (managed by IaC, not this role). This name is what ES/Kibana/Logstash
+# put in their certs and what clients must connect to (not the raw IP) for
+# TLS verification to succeed.
+elk_tls_domain: "{{ lookup('env', 'ELK_TLS_DOMAIN') | default('logs.domain.com', true) }}"
+
+# Contact email lego registers with the ACME account (Let's Encrypt notifies
+# this address about certificate/account issues, not renewal reminders,
+# since renewal is automated).
+elk_tls_acme_email: "{{ lookup('env', 'ELK_TLS_ACME_EMAIL') | default('webmaster@domain.com', true) }}"
+
+# Let's Encrypt production endpoint by default. Point this at the staging
+# endpoint while testing to avoid production rate limits:
+# https://acme-staging-v02.api.letsencrypt.org/directory
+elk_tls_acme_server: "{{ lookup('env', 'ELK_TLS_ACME_SERVER') | default('https://acme-v02.api.letsencrypt.org/directory', true) }}"
+
+# lego binary version/arch and install location.
+elk_lego_version: "4.20.4"
+elk_lego_arch: "amd64"   # amd64 | arm64
+elk_lego_install_dir: /usr/local/bin
+elk_lego_path: /etc/lego              # lego's --path (accounts + certificates live under here)
+elk_lego_certs_dir: "{{ elk_lego_path }}/certificates"
+
+# Path to the Cloudflare token env file. This is expected to already exist,
+# dropped by cloud-init at provisioning time (see IaC notes) as
+# root:root 0600, containing a line like:
+#   CF_DNS_API_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# This role only READS this file - it never receives or stores the token
+# itself, so the Cloudflare credential never touches Ansible inventory,
+# vault, logs, or the control node.
+elk_cloudflare_token_env_file: "{{ lookup('env', 'ELK_CLOUDFLARE_TOKEN_ENV_FILE') | default('/etc/lego/cloudflare-token.env', true) }}"
+
+# Threshold used on renewal checks - lego renews if the current cert has
+# fewer than this many days left before expiry.
+elk_tls_renew_days: 30
+
+# Renewal check cadence via systemd timer.
+elk_tls_renew_on_calendar: "22:00:00"
+elk_tls_renew_randomized_delay: "30m"
+

@@ -1,0 +1,29 @@
+# ansible_managed
+cluster.name: "{{ elk_elasticsearch_cluster_name }}"
+node.name: "{{ elk_elasticsearch_node_name }}"
+
+network.host: 0.0.0.0
+discovery.type: single-node
+
+# TLS (elk_tls_enabled) is a transport-layer concern independent of X-Pack
+# security (elk_security_enabled) - HOWEVER Elasticsearch only honors
+# xpack.security.http.ssl.* when xpack.security.enabled is true, so security
+# is force-enabled (elk_effective_security_enabled, set in tasks/main.yml)
+# whenever TLS is on, even if elk_security_enabled itself is false. The
+# ELASTIC_PASSWORD env var is set under the same condition (see
+# docker-compose.yml.j2), so basic auth is always usable whenever this is true.
+xpack.security.enabled: {{ elk_effective_security_enabled | lower }}
+{% if elk_tls_enabled %}
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.certificate: certs/{{ elk_tls_domain }}.crt
+xpack.security.http.ssl.key: certs/{{ elk_tls_domain }}.key
+xpack.security.http.ssl.certificate_authorities: ["certs/{{ elk_tls_domain }}.issuer.crt"]
+xpack.security.transport.ssl.enabled: false
+{% else %}
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+{% endif %}
+
+# Reachable at {{ 'https' if elk_tls_enabled else 'http' }}://{{ elk_elasticsearch_client_host }}:9200 from other
+# containers on the {{ elk_network_name }} docker network, and from outside
+# the host at {{ 'https' if elk_tls_enabled else 'http' }}://{{ elk_tls_domain if elk_tls_enabled else elk_elasticsearch_client_host }}:{{ elk_elasticsearch_http_port }}

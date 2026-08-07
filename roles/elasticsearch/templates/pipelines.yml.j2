@@ -1,5 +1,9 @@
+# ansible_managed
+- pipeline.id: main
+  path.config: "/usr/share/logstash/pipeline/main.conf"
+
 - pipeline.id: nginx_pipeline
-  path.config: "/usr/share/logstash/pipeline/nginx_pipeline.conf"
+  path.config: "/usr/share/logstash/pipeline/pipeline-nginx.conf"
 
 - pipeline.id: laravel_pipeline
-  path.config: "/usr/share/logstash/pipeline/laravel_pipeline.conf"
+  path.config: "/usr/share/logstash/pipeline/pipeline-laravel.conf"

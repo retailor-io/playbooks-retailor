@@ -1,0 +1,38 @@
+---
+- name: restart elk stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    state: present
+    recreate: always
+  listen: "restart elk stack"
+
+- name: recreate elasticsearch
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    services:
+      - elasticsearch
+    state: present
+    recreate: always
+  listen: "recreate elasticsearch"
+
+- name: recreate logstash
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    services:
+      - logstash
+    state: present
+    recreate: always
+  listen: "recreate logstash"
+
+- name: recreate kibana
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_base_dir }}"
+    project_name: "{{ elk_compose_project_name }}"
+    services:
+      - kibana
+    state: present
+    recreate: always
+  listen: "recreate kibana"

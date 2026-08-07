@@ -1,0 +1,176 @@
+---
+# ---------------------------------------------------------------------------
+# TLS certificate lifecycle via lego (ACME DNS-01 against Cloudflare).
+#
+# This file only READS the Cloudflare token from elk_cloudflare_token_env_file.
+# It never receives the token as an Ansible variable - the token is expected
+# to already exist on disk (root:root, 0600), placed there by cloud-init at
+# provisioning time. See the role README for the IaC side of this.
+# ---------------------------------------------------------------------------
+
+- name: Assert the Cloudflare token file exists
+  ansible.builtin.stat:
+    path: "{{ elk_cloudflare_token_env_file }}"
+  register: elk_cf_token_stat
+
+- name: Fail early with a clear message if the token file is missing
+  ansible.builtin.fail:
+    msg: >
+      {{ elk_cloudflare_token_env_file }} does not exist. This role expects
+      cloud-init (or equivalent provisioning) to have already written a
+      scoped Cloudflare API token here before Ansible runs. See the IaC
+      notes in the role README.
+  when: not elk_cf_token_stat.stat.exists
+
+- name: Verify the token file is not world/group readable
+  ansible.builtin.assert:
+    that:
+      - elk_cf_token_stat.stat.mode == "0600"
+    fail_msg: >
+      {{ elk_cloudflare_token_env_file }} should be mode 0600
+      (currently {{ elk_cf_token_stat.stat.mode }}) since it holds a
+      Cloudflare API credential.
+    success_msg: "Cloudflare token file permissions look correct."
+
+- name: Create lego directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - "{{ elk_lego_path }}"
+    - "{{ elk_lego_path }}/accounts"
+
+- name: Create lego certificates directory (traversable by container users)
+  ansible.builtin.file:
+    path: "{{ elk_lego_certs_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check installed lego version (if any)
+  ansible.builtin.command: "{{ elk_lego_install_dir }}/lego --version"
+  register: elk_lego_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Download and install lego binary
+  when: >
+    elk_lego_installed_version.rc != 0 or
+    elk_lego_version not in (elk_lego_installed_version.stdout | default(''))
+  block:
+    - name: Download lego release tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/go-acme/lego/releases/download/v{{ elk_lego_version }}/lego_v{{ elk_lego_version }}_linux_{{ elk_lego_arch }}.tar.gz"
+        dest: "/tmp/lego_{{ elk_lego_version }}.tar.gz"
+        mode: "0644"
+
+    - name: Extract lego binary
+      ansible.builtin.unarchive:
+        src: "/tmp/lego_{{ elk_lego_version }}.tar.gz"
+        dest: /tmp
+        remote_src: true
+        include:
+          - lego
+
+    - name: Install lego binary
+      ansible.builtin.copy:
+        src: /tmp/lego
+        dest: "{{ elk_lego_install_dir }}/lego"
+        owner: root
+        group: root
+        mode: "0755"
+        remote_src: true
+
+    - name: Clean up downloaded artifacts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/lego_{{ elk_lego_version }}.tar.gz"
+        - /tmp/lego
+
+- name: Check whether a certificate already exists for this domain
+  ansible.builtin.stat:
+    path: "{{ elk_lego_certs_dir }}/{{ elk_tls_domain }}.crt"
+  register: elk_cert_stat
+
+# First issuance uses `lego ... run`, which is what actually requests a new
+# certificate; `renew` (used by the systemd timer below) refuses to run
+# against a domain with no existing certificate.
+- name: Issue the initial certificate (first run only)
+  ansible.builtin.shell: |
+    set -o pipefail
+    set -a
+    source {{ elk_cloudflare_token_env_file }}
+    set +a
+    {{ elk_lego_install_dir }}/lego \
+      --accept-tos \
+      --email "{{ elk_tls_acme_email }}" \
+      --server "{{ elk_tls_acme_server }}" \
+      --domains "{{ elk_tls_domain }}" \
+      --dns cloudflare \
+      --path "{{ elk_lego_path }}" \
+      run
+  args:
+    executable: /bin/bash
+  when: not elk_cert_stat.stat.exists
+  register: elk_lego_first_issue
+  notify: "restart elk stack"
+
+- name: Ensure issued cert/key are readable by the containers (root-owned, group-readable)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ elk_lego_certs_dir }}/{{ elk_tls_domain }}.crt"
+    - "{{ elk_lego_certs_dir }}/{{ elk_tls_domain }}.issuer.crt"
+  when: elk_cert_stat.stat.exists or elk_lego_first_issue is not skipped
+
+- name: Private key stays root-only-readable but group-readable for the container runtime
+  ansible.builtin.file:
+    path: "{{ elk_lego_certs_dir }}/{{ elk_tls_domain }}.key"
+    owner: root
+    group: root
+    mode: "0640"
+  when: elk_cert_stat.stat.exists or elk_lego_first_issue is not skipped
+
+# ---------------------------------------------------------------------------
+# Ongoing renewal: systemd oneshot service + daily timer. lego's `renew`
+# subcommand only actually re-issues (and only then fires --run-hook) when
+# the certificate is within elk_tls_renew_days of expiring, so this is safe
+# to run daily without causing unnecessary container restarts.
+# ---------------------------------------------------------------------------
+- name: Template lego renewal systemd service
+  ansible.builtin.template:
+    src: lego-renew.service.j2
+    dest: /etc/systemd/system/lego-renew.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: elk_lego_service_unit
+
+- name: Template lego renewal systemd timer
+  ansible.builtin.template:
+    src: lego-renew.timer.j2
+    dest: /etc/systemd/system/lego-renew.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: elk_lego_timer_unit
+
+- name: Reload systemd if units changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: elk_lego_service_unit is changed or elk_lego_timer_unit is changed
+
+- name: Enable and start the lego renewal timer
+  ansible.builtin.systemd:
+    name: lego-renew.timer
+    enabled: true
+    state: started

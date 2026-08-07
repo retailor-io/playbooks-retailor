@@ -1,0 +1,147 @@
+# ansible_managed
+version: "3.8"
+
+networks:
+  {{ elk_network_name }}:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: {{ elk_network_subnet }}
+
+volumes:
+  {{ elk_elasticsearch_data_volume }}:
+    driver: local
+
+services:
+  elasticsearch:
+    image: "{{ elk_docker_image_repo }}/elasticsearch/elasticsearch:{{ elk_version }}"
+    container_name: "{{ elk_elasticsearch_container_name }}"
+    restart: unless-stopped
+    environment:
+      - node.name={{ elk_elasticsearch_node_name }}
+      - cluster.name={{ elk_elasticsearch_cluster_name }}
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms{{ elk_elasticsearch_heap_size }} -Xmx{{ elk_elasticsearch_heap_size }}"
+      # xpack.security.enabled must be true whenever TLS is on - Elasticsearch
+      # only honors xpack.security.http.ssl.* when security itself is
+      # enabled. elk_effective_security_enabled captures that (it's true if
+      # either elk_security_enabled or elk_tls_enabled is true). Whenever
+      # security ends up on for either reason, ELASTIC_PASSWORD must also be
+      # set - otherwise the image generates a random, unknown elastic
+      # password and nothing else in this stack could authenticate.
+      - xpack.security.enabled={{ elk_effective_security_enabled | lower }}
+{% if elk_effective_security_enabled %}
+      - ELASTIC_PASSWORD={{ elk_elastic_password }}
+{% endif %}
+{% if elk_tls_enabled %}
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.certificate=/usr/share/elasticsearch/config/certs/{{ elk_tls_domain }}.crt
+      - xpack.security.http.ssl.key=/usr/share/elasticsearch/config/certs/{{ elk_tls_domain }}.key
+      - xpack.security.http.ssl.certificate_authorities=/usr/share/elasticsearch/config/certs/{{ elk_tls_domain }}.issuer.crt
+      # Single node - transport SSL stays off. Turn this on (and add a
+      # matching transport cert) if this ever becomes a multi-node cluster.
+      - xpack.security.transport.ssl.enabled=false
+{% else %}
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+{% endif %}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - {{ elk_elasticsearch_data_volume }}:/usr/share/elasticsearch/data
+      - {{ elk_base_dir }}/config/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+{% if elk_tls_enabled %}
+      - {{ elk_lego_certs_dir }}:/usr/share/elasticsearch/config/certs:ro
+{% endif %}
+    ports:
+      - "{{ elk_elasticsearch_http_port }}:9200"
+      - "{{ elk_elasticsearch_transport_port }}:9300"
+    networks:
+      {{ elk_network_name }}:
+{% if elk_tls_enabled %}
+        aliases:
+          - "{{ elk_tls_domain }}"
+{% endif %}
+    healthcheck:
+      test:
+        - CMD-SHELL
+{% set es_scheme = 'https' if elk_tls_enabled else 'http' %}
+{% set curl_tls_flag = '-k ' if elk_tls_enabled else '' %}
+{# xpack.security.enabled follows elk_effective_security_enabled (see
+   above), so basic auth is required here under that same condition. #}
+{% if elk_effective_security_enabled %}
+        - "curl -s {{ curl_tls_flag }}-u elastic:{{ elk_elastic_password }} {{ es_scheme }}://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"
+{% else %}
+        - "curl -s {{ curl_tls_flag }}{{ es_scheme }}://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"
+{% endif %}
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  logstash:
+    image: "{{ elk_docker_image_repo }}/logstash/logstash:{{ elk_version }}"
+    container_name: "{{ elk_logstash_container_name }}"
+    restart: unless-stopped
+    environment:
+      - "LS_JAVA_OPTS=-Xms{{ elk_logstash_heap_size }} -Xmx{{ elk_logstash_heap_size }}"
+      - xpack.monitoring.enabled=false
+{% if elk_effective_security_enabled %}
+      - ELASTIC_USER=logstash_system
+      - ELASTIC_PASSWORD={{ elk_logstash_system_password }}
+{% endif %}
+    volumes:
+      - {{ elk_base_dir }}/config/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - {{ elk_base_dir }}/config/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - {{ elk_base_dir }}/config/logstash/pipeline:/usr/share/logstash/pipeline:ro
+{% if elk_tls_enabled %}
+      - {{ elk_lego_certs_dir }}:/usr/share/logstash/config/certs:ro
+{% endif %}
+    ports:
+      - "{{ elk_logstash_beats_port }}:5044"
+      - "{{ elk_logstash_nginx_beats_port }}:5045"
+      - "{{ elk_logstash_laravel_beats_port }}:5046"
+      - "{{ elk_logstash_tcp_port }}:5000/tcp"
+      - "{{ elk_logstash_udp_port }}:5000/udp"
+      - "{{ elk_logstash_http_port }}:9600"
+    networks:
+      - {{ elk_network_name }}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: "{{ elk_docker_image_repo }}/kibana/kibana:{{ elk_version }}"
+    container_name: "{{ elk_kibana_container_name }}"
+    restart: unless-stopped
+    environment:
+      - SERVER_NAME={{ elk_kibana_container_name }}
+      - ELASTICSEARCH_HOSTS={{ 'https' if elk_tls_enabled else 'http' }}://{{ elk_elasticsearch_client_host }}:9200
+{% if elk_effective_security_enabled %}
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD={{ elk_kibana_system_password }}
+      - XPACK_SECURITY_ENCRYPTIONKEY={{ elk_kibana_encryption_key }}
+{% endif %}
+{% if elk_tls_enabled %}
+      - SERVER_SSL_ENABLED=true
+      - SERVER_SSL_CERTIFICATE=/usr/share/kibana/config/certs/{{ elk_tls_domain }}.crt
+      - SERVER_SSL_KEY=/usr/share/kibana/config/certs/{{ elk_tls_domain }}.key
+      # Public CA (Let's Encrypt) is already trusted by the container's
+      # system trust store, so no custom CA needs to be supplied here for
+      # the Elasticsearch connection.
+{% endif %}
+    volumes:
+      - {{ elk_base_dir }}/config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+{% if elk_tls_enabled %}
+      - {{ elk_lego_certs_dir }}:/usr/share/kibana/config/certs:ro
+{% endif %}
+    ports:
+      - "{{ elk_kibana_http_port }}:5601"
+    networks:
+      - {{ elk_network_name }}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy

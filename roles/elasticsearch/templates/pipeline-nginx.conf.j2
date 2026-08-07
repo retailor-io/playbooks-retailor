@@ -1,6 +1,7 @@
+# ansible_managed
 input {
   beats {
-    port => 5044
+    port => 5045
   }
 }
 
@@ -36,10 +37,17 @@ filter {
 
 output {
   elasticsearch {
+    # Reach Elasticsearch over the shared docker network using its service name.
+    hosts => ["{{ 'https' if elk_tls_enabled else 'http' }}://{{ elk_elasticsearch_client_host }}:9200"]
+{% if elk_effective_security_enabled %}
+    user => "logstash_system"
+    password => "{{ elk_logstash_system_password }}"
+{% endif %}
+{% if elk_tls_enabled %}
+    ssl_enabled => true
+    # Public CA (Let's Encrypt) - trusted by Logstash's default JVM trust
+    # store already, no custom CA needs to be supplied here.
+{% endif %}
     index => "weblogs-%{+YYYY.MM}"
-    hosts => "${ELASTIC_HOSTS}"
-    user => "elastic"
-    password => "${ELASTIC_PASSWORD}"
-    document_type => "nginx_logs"
   }
 }

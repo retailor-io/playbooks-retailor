@@ -1,0 +1,28 @@
+# ansible_managed
+server.name: "{{ elk_kibana_container_name }}"
+server.host: "0.0.0.0"
+server.port: 5601
+
+# Talk to Elasticsearch over the shared docker network using its service name.
+elasticsearch.hosts: ["{{ 'https' if elk_tls_enabled else 'http' }}://{{ elk_elasticsearch_client_host }}:9200"]
+
+{% if elk_effective_security_enabled %}
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "{{ elk_kibana_system_password }}"
+xpack.security.encryptionKey: "{{ elk_kibana_encryption_key }}"
+{% endif %}
+
+{% if elk_tls_enabled %}
+server.ssl.enabled: true
+server.ssl.certificate: /usr/share/kibana/config/certs/{{ elk_tls_domain }}.crt
+server.ssl.key: /usr/share/kibana/config/certs/{{ elk_tls_domain }}.key
+
+server.publicBaseUrl: "https://{{ elk_tls_domain }}:{{ elk_kibana_http_port }}"
+
+# No elasticsearch.ssl.certificateAuthorities entry needed here: the cert
+# chain is issued by a public CA (Let's Encrypt) which the container's
+# default trust store already trusts.
+{% endif %}
+
+monitoring.ui.container.elasticsearch.enabled: true
+i18n.locale: "en"
