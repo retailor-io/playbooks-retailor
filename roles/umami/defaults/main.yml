@@ -5,3 +5,33 @@ umami_python_docker_sdk_packages:
 
 umami_restart_policy: unless-stopped
 umami_docker_network: umami_net
+
+# --- Umami role ---
+umami_base_dir: "{{ lookup('env', 'UMAMI_BASE_DIR') | default('/opt/umami', true) }}"
+umami_image: "{{ lookup('env', 'UMAMI_IMAGE') | default('ghcr.io/umami-software/umami:latest', true) }}"
+umami_container_name: "{{ lookup('env', 'UMAMI_CONTAINER_NAME') | default('umami', true) }}"
+umami_port: "{{ lookup('env', 'UMAMI_PORT') | default('3000', true) }}"   # host port Umami will be exposed on
+
+# Address the umami_port is bound to on the host.
+# - "127.0.0.1" if your reverse proxy runs on this same host (loopback only)
+# - "0.0.0.0" if your reverse proxy is elsewhere (another host/container) and
+#   needs to reach this port over the network
+umami_bind_address: "{{ lookup('env', 'UMAMI_BIND_ADDRESS') | default('0.0.0.0', true) }}"
+umami_admin_password: "{{ lookup('env', 'UMAMI_ADMIN_PASSWORD') | default('', true) }}"
+
+# Postgres settings (used by the umami-db container)
+umami_db_container_name: "{{ lookup('env', 'UMAMI_DB_CONTAINER_NAME') | default('umami-db', true) }}"
+umami_db_image: "{{ lookup('env', 'UMAMI_DB_IMAGE') | default('postgres:15-alpine', true) }}"
+umami_db_name: "{{ lookup('env', 'UMAMI_DB_NAME') | default('umami', true) }}"
+umami_db_user: "{{ lookup('env', 'UMAMI_DB_USER') | default('umami', true) }}"
+
+# IMPORTANT: override this via the UMAMI_DB_PASSWORD environment variable,
+# inventory/vars, --extra-vars, or (better) Ansible Vault.
+# Do not leave the default password in production.
+umami_db_password: "{{ lookup('env', 'UMAMI_DB_PASSWORD') | default('', true) }}"
+
+# A random string used by Umami to encrypt/salt data. Generate your own, e.g.:
+#   openssl rand -hex 32
+# Override this in production via the UMAMI_APP_SECRET environment variable,
+# --extra-vars, or vault.
+umami_app_secret: "{{ lookup('env', 'UMAMI_APP_SECRET') | default('', true) }}"

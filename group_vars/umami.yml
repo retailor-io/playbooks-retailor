@@ -10,18 +10,7 @@ description: Umami web analytics
 docker_users_to_add:
   - "{{ ansible_user }}"   # add the SSH user to the docker group
 
-# --- Umami role ---
-umami_base_dir: /opt/umami
-umami_image: "ghcr.io/umami-software/umami:latest"
-umami_container_name: umami
-umami_port: 3000                     # host port Umami will be exposed on
-
-# Address the umami_port is bound to on the host.
-# - "127.0.0.1" if your reverse proxy runs on this same host (loopback only)
-# - "0.0.0.0" if your reverse proxy is elsewhere (another host/container) and
-#   needs to reach this port over the network
-umami_bind_address: "0.0.0.0"
-
+umami_admin_password: "0cf1c36d008b67d42ad9eb5b0b802b2d"
 # Postgres settings (used by the umami-db container)
 umami_db_container_name: umami-db
 umami_db_image: "postgres:15-alpine"

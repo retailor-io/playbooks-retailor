@@ -45,6 +45,14 @@
   retries: 5
   delay: 10
 
+- name: Update Umami admin password via psql inside the db container
+  community.docker.docker_container_exec:
+    container: "{{ umami_db_container_name }}"
+    command: >
+      psql -U {{ umami_db_user }} -d {{ umami_db_name }} -c
+      "UPDATE \"user\" SET password = '{{ umami_admin_password }}' WHERE username = 'admin';"
+  no_log: true
+
 - name: Umami health check result
   ansible.builtin.debug:
     msg: "Umami is up and responding on port {{ umami_port }}."
