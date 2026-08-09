@@ -8,7 +8,18 @@
 # provisioning time. See the role README for the IaC side of this.
 # ---------------------------------------------------------------------------
 
-- name: Assert the Cloudflare token file exists
+- name: Check if Cloudflare token file exists at legacy/staging path
+  ansible.builtin.stat:
+    path: /etc/retailor/cloudflare-token.env
+  register: elk_cf_token_src_stat
+
+- name: Move Cloudflare token file into place if found at staging path
+  ansible.builtin.command:
+    cmd: mv /etc/retailor/cloudflare-token.env "{{ elk_cloudflare_token_env_file }}"
+  when: elk_cf_token_src_stat.stat.exists
+  changed_when: true
+
+- name: Assert the Cloudflare token file exists at the expected location
   ansible.builtin.stat:
     path: "{{ elk_cloudflare_token_env_file }}"
   register: elk_cf_token_stat
@@ -18,19 +29,33 @@
     msg: >
       {{ elk_cloudflare_token_env_file }} does not exist. This role expects
       cloud-init (or equivalent provisioning) to have already written a
-      scoped Cloudflare API token here before Ansible runs. See the IaC
-      notes in the role README.
+      scoped Cloudflare API token here before Ansible runs, or a legacy
+      copy at /etc/retailor/cloudflare-token.env to be moved into place. See the
+      IaC notes in the role README.
   when: not elk_cf_token_stat.stat.exists
 
-- name: Verify the token file is not world/group readable
+- name: Ensure the token file has correct ownership and permissions
+  ansible.builtin.file:
+    path: "{{ elk_cloudflare_token_env_file }}"
+    mode: "0640"
+    owner: root
+    group: root
+  when: elk_cf_token_stat.stat.exists
+
+- name: Re-stat token file after permission enforcement
+  ansible.builtin.stat:
+    path: "{{ elk_cloudflare_token_env_file }}"
+  register: elk_cf_token_stat
+
+- name: Verify the token file is not world readable
   ansible.builtin.assert:
     that:
-      - elk_cf_token_stat.stat.mode == "0600"
+      - elk_cf_token_stat.stat.mode == "0640"
     fail_msg: >
-      {{ elk_cloudflare_token_env_file }} should be mode 0600
+      {{ elk_cloudflare_token_env_file }} should be mode 0640
       (currently {{ elk_cf_token_stat.stat.mode }}) since it holds a
       Cloudflare API credential.
-    success_msg: "Cloudflare token file permissions look correct."
+    success_msg: "Cloudflare token file permissions verified."
 
 - name: Create lego directories
   ansible.builtin.file:
