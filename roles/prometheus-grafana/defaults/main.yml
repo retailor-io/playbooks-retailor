@@ -4,3 +4,7 @@ dashboard_folders:
   - container
   - cache
   - server
+
+grafana_password: "{{ lookup('env', 'GRAFANA_PASSWORD') | default('change-me-password', true) }}"
+slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('', true) }}"
+discord_webhook_url: "{{ lookup('env', 'DISCORD_WEBHOOK_URL') | default('', true }}"
