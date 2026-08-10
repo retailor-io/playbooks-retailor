@@ -45,12 +45,17 @@
   retries: 5
   delay: 10
 
+- name: Generate bcrypt hash for Umami admin password
+  ansible.builtin.set_fact:
+    umami_admin_password_hash: "{{ umami_admin_password | password_hash('bcrypt', rounds=10) }}"
+  no_log: true
+
 - name: Update Umami admin password via psql inside the db container
   community.docker.docker_container_exec:
     container: "{{ umami_db_container_name }}"
     command: >
       psql -U {{ umami_db_user }} -d {{ umami_db_name }} -c
-      "UPDATE \"user\" SET password = '{{ umami_admin_password }}' WHERE username = 'admin';"
+      "UPDATE \"user\" SET password = '{{ umami_admin_password_hash }}' WHERE username = 'admin';"
   no_log: true
 
 - name: Umami health check result
