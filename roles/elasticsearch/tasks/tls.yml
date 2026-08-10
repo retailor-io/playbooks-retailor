@@ -135,9 +135,7 @@
 - name: Issue the initial certificate (first run only)
   ansible.builtin.shell: |
     set -o pipefail
-    set -a
-    source {{ elk_cloudflare_token_env_file }}
-    set +a
+    export $(cat "{{ elk_cloudflare_token_env_file}}" | xargs) && \
     {{ elk_lego_install_dir }}/lego \
       --accept-tos \
       --email "{{ elk_tls_acme_email }}" \

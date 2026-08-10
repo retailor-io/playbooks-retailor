@@ -55,15 +55,15 @@
 # TLS (must happen before compose/config templating below, since those
 # templates reference the cert file paths lego produces)
 # ---------------------------------------------------------------------------
-- name: Issue/renew TLS certificate and set up renewal automation
-  ansible.builtin.include_tasks: tls.yml
-  when: elk_tls_enabled
-
-- name: Set connection facts used by health checks below
-  ansible.builtin.set_fact:
-    elk_scheme: "{{ 'https' if elk_tls_enabled else 'http' }}"
-    elk_validate_certs: "{{ not elk_tls_enabled }}"
-    elk_elasticsearch_client_host: "{{ elk_tls_domain if elk_tls_enabled else elk_elasticsearch_container_name }}"
+# - name: Issue/renew TLS certificate and set up renewal automation
+#   ansible.builtin.include_tasks: tls.yml
+#   when: elk_tls_enabled
+# 
+# - name: Set connection facts used by health checks below
+#   ansible.builtin.set_fact:
+#     elk_scheme: "{{ 'https' if elk_tls_enabled else 'http' }}"
+#     elk_validate_certs: "{{ not elk_tls_enabled }}"
+#     elk_elasticsearch_client_host: "{{ elk_tls_domain if elk_tls_enabled else elk_elasticsearch_container_name }}"
 
 # ---------------------------------------------------------------------------
 # Configs
