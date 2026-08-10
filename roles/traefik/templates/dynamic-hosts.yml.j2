@@ -18,7 +18,7 @@ http:
     retailor-web-svc:
       loadBalancer:
         servers:
-{% for web_ip in traefik_web_private_ips | from_json %}
+{% for web_ip in traefik_web_private_ips %}
           - url: "http://{{ web_ip }}:80"
 {% endfor %}
         healthCheck:

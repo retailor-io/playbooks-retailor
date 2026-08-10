@@ -4,6 +4,8 @@ traefik_web_port: 80
 traefik_websecure_port: 443
 traefik_dashboard_port: 8080
 traefik_metrics_port: 8100
+
+traefik_image: "traefik:v3.1"
 traefik_dashboard_insecure: true   # ufw should only allow from tailscale or vnet
 traefik_acme_staging: "{{ lookup('env', 'TRAEFIK_ACME_STAGING') | default('false', true) }}"
 
@@ -12,5 +14,5 @@ traefik_domain: "{{ lookup('env', 'DOMAIN') | default('', true) }}"
 # Single source of truth for static routing. Expected to be overridden
 # from group_vars, -e, or an env-var lookup at the play level — see
 # playbook.yml for the TRAEFIK_ROUTES example.
-traefik_web_private_ips: "{{ lookup('env', 'WEB_IPS') | default('[]', true) | from_json }}"
+traefik_web_private_ips: "{{ lookup('env', 'WEB_IPS') | from_json }}"
 traefik_analytics_private_ip: "{{ lookup('env', 'ANALYTICS_IP') | default('', true) }}"
