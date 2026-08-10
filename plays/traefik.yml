@@ -4,5 +4,4 @@
   roles:
     - role: roles/firewall
     - role: roles/docker
-    - role: roles/env
     - role: roles/traefik

@@ -3,22 +3,22 @@
 http:
   routers:
     retailor-web:
-      rule: "Host(`app.{{ env_vars.DOMAIN }}`)"
+      rule: "Host(`app.{{ traefik_domain }}`)"
       service: retailor-web-svc
       entryPoints:
         - websecure
       tls:
         certResolver: letsencrypt
         domains:
-          - main: "app.{{ env_vars.DOMAIN }}"
+          - main: "app.{{ traefik_domain }}"
             sans:
-              - "blog.{{ env_vars.DOMAIN }}"
+              - "blog.{{ traefik_domain }}"
 
   services:
     retailor-web-svc:
       loadBalancer:
         servers:
-{% for web_ip in env_vars.WEB_IPS | from_json %}
+{% for web_ip in traefik_web_private_ips | from_json %}
           - url: "http://{{ web_ip }}:80"
 {% endfor %}
         healthCheck:

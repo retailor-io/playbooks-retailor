@@ -5,7 +5,7 @@
       traefik_web_private_ips is empty. Set the WEB_IPS env var
       (JSON list) before running, or override the variable directly, e.g.
       -e traefik_web_private_ips='["10.0.1.11","10.0.1.12"]'
-  when: env_vars.WEB_IPS | length == 0
+  when: traefik_web_private_ips | length == 0
 
 - name: Ensure Traefik config directories exist
   ansible.builtin.file:

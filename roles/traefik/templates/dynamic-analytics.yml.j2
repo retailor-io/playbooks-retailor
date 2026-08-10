@@ -3,22 +3,22 @@
 http:
   routers:
     analytics:
-      rule: "Host(`analytics.{{ env_vars.DOMAIN }}`)"
+      rule: "Host(`analytics.{{ traefik_domain }}`)"
       entryPoints:
         - websecure
       service: analytics-svc
       tls:
         certResolver: letsencrypt
         domains:
-          - main: "analytics.{{ env_vars.DOMAIN }}"
+          - main: "analytics.{{ traefik_domain }}"
             sans:
-              - "blog.{{ env_vars.DOMAIN }}"
+              - "blog.{{ traefik_domain }}"
 
   services:
     analytics-svc:
       loadBalancer:
         servers:
-          - url: "http://{{ env_vars.ANALYTICS_IP }}:3000"
+          - url: "http://{{ traefik_analytics_private_ip }}:3000"
         healthCheck:
           path: /api/heartbeat
           interval: "10s"
