@@ -1,0 +1,12 @@
+---
+- name: Install & configure redis
+  hosts: all
+  vars:
+    custom_firewall_ports:
+      - 6379
+    install_redis_exporter: true
+    description: 'cache node for retailor redis cache'
+  roles:
+    - role: roles/firewall
+    - role: roles/redis
+

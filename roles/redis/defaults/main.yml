@@ -1,0 +1,41 @@
+---
+# --- Role / topology ---
+redis_role: "{{ lookup('env', 'REDIS_ROLE') | default('primary', true) }}"               # primary | replica
+redis_primary_host: "{{ lookup('env', 'REDIS_PRIMARY_HOST') | default('', true) }}"
+
+# --- Network ---
+redis_bind_addresses: "127.0.0.1 10.0.0.0/8"
+redis_bind_addresses: "0.0.0.0"
+redis_port: 6379
+redis_trusted_cidr: "{{ lookup('env', 'REDIS_ALLOWED_CIDR') | default('10.0.1.0/24', true) }}"
+
+# --- Auth (override via vault; do NOT commit plaintext) ---
+redis_password: "{{ lookup('env', 'REDIS_PASSWORD') | default('', false) }}"
+
+# --- Memory ---
+redis_maxmemory: "{{ lookup('env', 'REDIS_TOTAL_RAM_GB') | default('2', true) | int }}gb"
+redis_maxmemory_policy: "allkeys-lru"  # use "noeviction" if Redis is a source of truth
+
+# --- Persistence ---
+redis_appendonly: "yes"
+redis_appendfsync: "everysec"          # everysec | always | no
+
+# --- Dangerous command handling ---
+redis_disable_flushall: true
+redis_disable_flushdb: true
+redis_disable_debug: true
+redis_disable_keys: true
+redis_rename_config: true
+redis_rename_shutdown: true
+
+# --- Package ---
+redis_package_state: present
+
+# --- Limits ---
+redis_nofile_limit: 65536
+
+# TODO(kevinmidboe): just reference the certs acme.sh generates
+redis_tls_enabled: "{{ lookup('env', 'REDIS_TLS_ENABLED') | default('', false) }}"
+redis_tls_cert_path: ""
+redis_tls_key_path: ""
+redis_tls_ca_path: ""

@@ -1,0 +1,155 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install redis-server and firewall tooling
+  ansible.builtin.apt:
+    name:
+      - redis-server
+      - ufw
+    state: "{{ redis_package_state }}"
+
+- name: Ensure redis data/log/run directories exist with correct ownership
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: redis
+    group: redis
+    mode: "0750"
+  loop:
+    - /var/lib/redis
+    - /var/log/redis
+    - /run/redis
+
+# --- Kernel tuning ---
+- name: Apply sysctl tuning for Redis
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-redis.conf
+    content: |
+      vm.overcommit_memory = 1
+      vm.swappiness = 1
+      net.core.somaxconn = 511
+    mode: "0644"
+  notify: Reload sysctl
+
+- name: Disable Transparent Huge Pages via systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/disable-thp.service
+    content: |
+      [Unit]
+      Description=Disable Transparent Huge Pages (THP)
+      Before=redis-server.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Enable and start disable-thp
+
+- name: Raise nofile limits for redis user
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/redis.conf
+    content: |
+      redis soft nofile {{ redis_nofile_limit }}
+      redis hard nofile {{ redis_nofile_limit }}
+    mode: "0644"
+
+- name: Add systemd override for redis-server (limits + restart policy)
+  ansible.builtin.file:
+    path: /etc/systemd/system/redis-server.service.d
+    state: directory
+    mode: "0755"
+
+- name: Deploy systemd override.conf
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/redis-server.service.d/override.conf
+    content: |
+      [Service]
+      LimitNOFILE={{ redis_nofile_limit }}
+      Restart=always
+      RestartSec=5
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart redis
+
+# --- Main config ---
+- name: Deploy redis.conf from template
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: "0640"
+  notify: Restart redis
+
+- name: Deploy logrotate config
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/redis-server
+    content: |
+      /var/log/redis/redis-server.log {
+        weekly
+        rotate 8
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 640 redis redis
+      }
+    mode: "0644"
+
+# --- Firewall ---
+- name: Allow SSH through ufw
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: Allow Redis port from trusted CIDR only
+  community.general.ufw:
+    rule: allow
+    port: "{{ redis_port | string }}"
+    proto: tcp
+    src: "{{ redis_trusted_cidr }}"
+
+- name: Set default ufw policies
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Allow outgoing traffic
+  community.general.ufw:
+    policy: allow
+    direction: outgoing
+
+# --- Service ---
+- name: Ensure redis-server is enabled and started
+  ansible.builtin.systemd:
+    name: redis-server
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Verify Redis responds to PING
+  ansible.builtin.command: >
+    redis-cli -a {{ redis_password }} --no-auth-warning
+    -h 127.0.0.1 -p {{ redis_port }} ping
+  register: redis_ping_result
+  changed_when: false
+  no_log: true
+
+- name: Assert Redis is healthy
+  ansible.builtin.assert:
+    that:
+      - "'PONG' in redis_ping_result.stdout"
+    fail_msg: "Redis did not respond with PONG after configuration."
