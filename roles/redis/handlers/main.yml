@@ -1,0 +1,20 @@
+---
+- name: Reload sysctl
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/99-redis.conf
+  changed_when: false
+ 
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+ 
+- name: Enable and start disable-thp
+  ansible.builtin.systemd:
+    name: disable-thp.service
+    enabled: true
+    state: started
+ 
+- name: Restart redis
+  ansible.builtin.systemd:
+    name: redis-server
+    state: restarted
+ 
