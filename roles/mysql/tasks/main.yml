@@ -1,0 +1,155 @@
+---
+- name: Install prerequisite packages
+  apt:
+    name:
+      - gnupg2
+      - lsb-release
+      - python3-pymysql   # required by Ansible's community.mysql modules
+      - ufw
+    state: present
+    update_cache: true
+
+- name: Install MySQL server
+  apt:
+    name:
+      - mysql-server-8.0
+      - mysql-client-8.0
+    state: present
+  notify: restart mysql
+
+- name: Ensure MySQL data/log directories exist with correct ownership
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0750'
+  loop:
+    - /var/log/mysql
+    - "{{ mysql_backup_dir }}"
+
+- name: Deploy tuned my.cnf
+  template:
+    src: my.cnf.j2
+    dest: /etc/mysql/mysql.conf.d/99-production.cnf
+    owner: root
+    group: root
+    mode: '0644'
+    # validate: 'mysqld --defaults-file=%s --validate-config'
+  notify: restart mysql
+
+- name: Start and enable MySQL
+  systemd:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Set MySQL root password (idempotent — only runs if not already set)
+  community.mysql.mysql_user:
+    name: root
+    password: "{{ mysql_root_password }}"
+    host: localhost
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    state: present
+  no_log: true
+
+- name: Create .my.cnf for root so future plays authenticate automatically
+  template:
+    src: root_my_cnf.j2
+    dest: /root/.my.cnf
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+# --- mysql_secure_installation equivalent, done idempotently ---------------
+- name: Remove anonymous MySQL users
+  community.mysql.mysql_user:
+    name: ''
+    host_all: true
+    state: absent
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Remove test database
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Disallow remote root login
+  community.mysql.mysql_user:
+    name: root
+    host: "{{ item }}"
+    state: absent
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  loop:
+    - "{{ ansible_hostname }}"
+    - "%"
+  ignore_errors: true   # fine if they don't exist
+
+# --- Firewall: only allow MySQL port from known CIDRs ----------------------
+- name: Allow MySQL port from trusted CIDRs only
+  community.general.ufw:
+    rule: allow
+    port: "{{ mysql_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ mysql_allowed_cidrs }}"
+
+- name: Reload ufw
+  community.general.ufw:
+    state: enabled
+
+# --- Application DB + user --------------------------------------------------
+- name: Create retailor database
+  community.mysql.mysql_db:
+    name: "{{ mysql_app_database }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Create forge user
+  community.mysql.mysql_user:
+    name: "{{ mysql_app_user }}"
+    password: "{{ mysql_app_password }}"
+    priv: "{{ mysql_app_database }}.*:ALL"
+    host: '%'
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  no_log: true
+
+- name: Create replication user
+  community.mysql.mysql_user:
+    name: "{{ mysql_replication_user }}"
+    password: "{{ mysql_replication_password }}"
+    priv: "*.*:REPLICATION SLAVE"
+    host: '%'
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  no_log: true
+
+- name: Deploy logrotate config
+  template:
+    src: logrotate_mysql.j2
+    dest: /etc/logrotate.d/mysql-server
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy backup script
+  template:
+    src: mysql_backup.sh.j2
+    dest: /usr/local/bin/mysql_backup.sh
+    owner: root
+    group: root
+    mode: '0750'
+  when: mysql_backup_enabled
+
+- name: Schedule nightly backup cron
+  cron:
+    name: "mysql nightly backup"
+    hour: "{{ mysql_backup_hour }}"
+    minute: "0"
+    job: "/usr/local/bin/mysql_backup.sh >> /var/log/mysql/backup.log 2>&1"
+    user: root
+  when: mysql_backup_enabled
+
